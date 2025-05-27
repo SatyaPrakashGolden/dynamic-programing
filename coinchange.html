@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coin Change Dual Stack Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .array-section h3, .memo-section h3, .execution-section h3 {
+            margin-top: 0;
+            color: #2980b9;
+        }
+        .array-items {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .array-item {
+            background: #ecf0f1;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            min-width: 40px;
+        }
+        .array-item.highlighted {
+            background: #f1c40f;
+            font-weight: bold;
+        }
+        .array-index {
+            font-size: 0.8em;
+            color: #7f8c8d;
+        }
+        .memo-grid {
+            display: grid;
+            gap: 2px;
+            margin-top: 10px;
+        }
+        .memo-cell {
+            padding: 10px;
+            background: #ecf0f1;
+            text-align: center;
+            border-radius: 4px;
+        }
+        .memo-cell.header {
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        .memo-cell.empty {
+            color: #bdc3c7;
+        }
+        .memo-cell.updated {
+            background: #2ecc71;
+            color: white;
+            animation: highlight 1s ease-out;
+        }
+        @keyframes highlight {
+            from { background: #27ae60; }
+            to { background: #2ecc71; }
+        }
+        .stack-container {
+            display: flex;
+            gap: 20px;
+        }
+        .stack {
+            flex: 1;
+        }
+        .stack-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            background: #ecf0f1;
+        }
+        .stack-item.active {
+            background: #e74c3c;
+            color: white;
+        }
+        .stack-item.processing {
+            background: #f1c40f;
+            font-weight: bold;
+        }
+        .stack-item.computed {
+            background: #2ecc71;
+            color: white;
+        }
+        .operation {
+            margin-top: 10px;
+            background: #34495e;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .flow-section {
+            text-align: center;
+        }
+        .flow-label {
+            background: #9b59b6;
+            color: white;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            display: inline-block;
+        }
+        .flow-arrow {
+            font-size: 1.2em;
+            color: #7f8c8d;
+        }
+        #stepSlider {
+            width: 100%;
+            margin-top: 10px;
+        }
+        #stepLabel {
+            text-align: center;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <h1>💰 Coin Change Dual Stack Visualization</h1>
+    <div class="container">
+        <div class="section array-section">
+            <h3>💰 Coins Array</h3>
+            <div class="array-items" id="coinsItems"></div>
+        </div>
+        <div class="section memo-section">
+            <h3>📊 Memoization Table</h3>
+            <div class="memo-grid" id="memoGrid"></div>
+        </div>
+        <div class="section execution-section">
+            <h3>⚙️ Execution Stacks</h3>
+            <div class="stack-container">
+                <div class="stack">
+                    <h4>📞 Call Stack</h4>
+                    <div id="callStack"></div>
+                </div>
+                <div class="stack">
+                    <h4>✅ Return Stack</h4>
+                    <div id="returnStack"></div>
+                </div>
+            </div>
+            <div class="operation" id="currentOperation"></div>
+        </div>
+        <div class="section flow-section">
+            <h3>🔄 DP Flow</h3>
+            <div class="flow-label">Call ways(amount, idx)</div>
+            <div class="flow-arrow">⬇️</div>
+            <div class="flow-label">Base Cases: amount=0 or idx>=len(coins)</div>
+            <div class="flow-arrow">⬇️</div>
+            <div class="flow-label">Compute use = ways(amount - coin, idx)</div>
+            <div class="flow-label">Compute skip = ways(amount, idx + 1)</div>
+            <div class="flow-arrow">⬇️</div>
+            <div class="flow-label">Return use + skip</div>
+        </div>
+        <div class="section">
+            <input type="range" id="stepSlider" min="0" value="0">
+            <div id="stepLabel"></div>
+        </div>
+    </div>
+
+    <script>
+        const coins = [1, 2];
+        const amount = 3;
+        const executionSteps = [
+            {
+                step: 0,
+                description: "🚀 Starting Dynamic Programming - Call ways(3,0)",
+                callStack: [],
+                returnStack: [],
+                memo: [[-1,-1],[-1,-1],[-1,-1],[-1,-1]],
+                highlight: null,
+                operation: "Initialize: Start with ways(3,0) to find number of ways to make amount 3 with coins [1,2]",
+                updatedMemo: []
+            },
+            {
+                step: 1,
+                description: "📞 Push ways(3,0) to Call Stack - Need to compute result",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}],
+                returnStack: [],
+                memo: [[-1,-1],[-1,-1],[-1,-1],[-1,-1]],
+                highlight: 0,
+                operation: "ways(3,0): Check memo[3][0]=-1 (not cached)\nNeed to compute: ways(3,0) = ways(2,0) + ways(3,1)",
+                updatedMemo: []
+            },
+            {
+                step: 2,
+                description: "From ways(3,0), call ways(2,0) for using coin 0 (1)",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}],
+                returnStack: [],
+                memo: [[-1,-1],[-1,-1],[-1,-1],[-1,-1]],
+                highlight: 0,
+                operation: "ways(3,0): Since amount=3 > 0 and idx=0 < 2, compute use = ways(3-1,0) = ways(2,0)",
+                updatedMemo: []
+            },
+            {
+                step: 3,
+                description: "From ways(2,0), call ways(1,0) for using coin 0 (1)",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}, {call: "ways(1,0)", amount:1, idx:0, value: "?"}],
+                returnStack: [],
+                memo: [[-1,-1],[-1,-1],[-1,-1],[-1,-1]],
+                highlight: 0,
+                operation: "ways(2,0): Compute use = ways(2-1,0) = ways(1,0)",
+                updatedMemo: []
+            },
+            {
+                step: 4,
+                description: "From ways(1,0), call ways(0,0) for using coin 0 (1)",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}, {call: "ways(1,0)", amount:1, idx:0, value: "?"}, {call: "ways(0,0)", amount:0, idx:0, value: "?"}],
+                returnStack: [],
+                memo: [[-1,-1],[-1,-1],[-1,-1],[-1,-1]],
+                highlight: 0,
+                operation: "ways(1,0): Compute use = ways(1-1,0) = ways(0,0)",
+                updatedMemo: []
+            },
+            {
+                step: 5,
+                description: "ways(0,0): Base case, return 1",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}, {call: "ways(1,0)", amount:1, idx:0, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}],
+                memo: [[1,-1],[-1,-1],[-1,-1],[-1,-1]],
+                highlight: 0,
+                operation: "ways(0,0): Amount=0, return 1. Set memo[0][0]=1",
+                updatedMemo: [[0,0]]
+            },
+            {
+                step: 6,
+                description: "Back to ways(1,0), set use=1, then call ways(1,1) for skip",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}, {call: "ways(1,0)", amount:1, idx:0, value: "?"}, {call: "ways(1,1)", amount:1, idx:1, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}],
+                memo: [[1,-1],[-1,-1],[-1,-1],[-1,-1]],
+                highlight: 1,
+                operation: "ways(1,0): Received use=1 from ways(0,0). Now compute skip = ways(1,1)",
+                updatedMemo: []
+            },
+            {
+                step: 7,
+                description: "From ways(1,1), since amount=1 < coin=2, can't use, so call ways(1,2)",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}, {call: "ways(1,0)", amount:1, idx:0, value: "?"}, {call: "ways(1,1)", amount:1, idx:1, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,2)", value:0, reason: "idx>=len(coins)"}],
+                memo: [[1,-1],[-1,-1],[-1,-1],[-1,-1]],
+                highlight: 1,
+                operation: "ways(1,1): amount=1 < coin=2, can't use coin, so return ways(1,2)=0 since idx=2>=2",
+                updatedMemo: []
+            },
+            {
+                step: 8,
+                description: "ways(1,1)=0, set memo[1][1]=0, pop, return 0",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}, {call: "ways(1,0)", amount:1, idx:0, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}],
+                memo: [[1,-1],[1,0],[-1,-1],[-1,-1]],
+                highlight: 1,
+                operation: "ways(1,1): Computed 0, set memo[1][1]=0",
+                updatedMemo: [[1,1]]
+            },
+            {
+                step: 9,
+                description: "Back to ways(1,0), set skip=0, so ways(1,0)=1+0=1, set memo[1][0]=1",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}],
+                memo: [[1,-1],[1,0],[-1,-1],[-1,-1]],
+                highlight: 0,
+                operation: "ways(1,0): Computed 1, set memo[1][0]=1",
+                updatedMemo: [[1,0]]
+            },
+            {
+                step: 10,
+                description: "Back to ways(2,0), set use=1, then call ways(2,1) for skip",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}, {call: "ways(2,1)", amount:2, idx:1, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}],
+                memo: [[1,-1],[1,0],[-1,-1],[-1,-1]],
+                highlight: 1,
+                operation: "ways(2,0): Received use=1 from ways(1,0). Now compute skip = ways(2,1)",
+                updatedMemo: []
+            },
+            {
+                step: 11,
+                description: "From ways(2,1), call ways(0,1) for using coin 1 (2)",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}, {call: "ways(2,1)", amount:2, idx:1, value: "?"}, {call: "ways(0,1)", amount:0, idx:1, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}],
+                memo: [[1,-1],[1,0],[-1,-1],[-1,-1]],
+                highlight: 1,
+                operation: "ways(2,1): Compute use = ways(2-2,1) = ways(0,1)",
+                updatedMemo: []
+            },
+            {
+                step: 12,
+                description: "ways(0,1): Base case, return 1",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}, {call: "ways(2,1)", amount:2, idx:1, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(0,1)", value:1, reason: "Base case: amount=0"}],
+                memo: [[1,-1],[1,0],[-1,-1],[-1,-1]],
+                highlight: 1,
+                operation: "ways(0,1): Amount=0, return 1. Set memo[0][1]=1",
+                updatedMemo: [[0,1]]
+            },
+            {
+                step: 13,
+                description: "Back to ways(2,1), set use=1, then call ways(2,2) for skip",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(2,0)", amount:2, idx:0, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(0,1)", value:1, reason: "Base case: amount=0"}, {call: "ways(2,1)", value:1, reason: "use + skip =1+0=1"}],
+                memo: [[1,-1],[1,0],[1,1],[-1,-1]],
+                highlight: 1,
+                operation: "ways(2,1): Received use=1 from ways(0,1), skip=ways(2,2)=0 (idx>=2). Computed ways(2,1)=1, set memo[2][1]=1",
+                updatedMemo: [[2,1]]
+            },
+            {
+                step: 14,
+                description: "Back to ways(2,0), set skip=1, so ways(2,0)=1+1=2, set memo[2][0]=2",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(0,1)", value:1, reason: "Base case: amount=0"}, {call: "ways(2,1)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(2,0)", value:2, reason: "use + skip =1+1=2"}],
+                memo: [[1,-1],[1,0],[2,1],[-1,-1]],
+                highlight: 0,
+                operation: "ways(2,0): Computed 2, set memo[2][0]=2",
+                updatedMemo: [[2,0]]
+            },
+            {
+                step: 15,
+                description: "Back to ways(3,0), set use=2, then call ways(3,1) for skip",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(3,1)", amount:3, idx:1, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(0,1)", value:1, reason: "Base case: amount=0"}, {call: "ways(2,1)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(2,0)", value:2, reason: "use + skip =1+1=2"}],
+                memo: [[1,-1],[1,0],[2,1],[-1,-1]],
+                highlight: 1,
+                operation: "ways(3,0): Received use=2 from ways(2,0). Now compute skip = ways(3,1)",
+                updatedMemo: []
+            },
+            {
+                step: 16,
+                description: "From ways(3,1), call ways(1,1) for using coin 1 (2)",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(3,1)", amount:3, idx:1, value: "?"}, {call: "ways(1,1)", amount:1, idx:1, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(0,1)", value:1, reason: "Base case: amount=0"}, {call: "ways(2,1)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(2,0)", value:2, reason: "use + skip =1+1=2"}],
+                memo: [[1,-1],[1,0],[2,1],[-1,-1]],
+                highlight: 1,
+                operation: "ways(3,1): Check memo[1][1]=0, use cached value 0",
+                updatedMemo: []
+            },
+            {
+                step: 17,
+                description: "Back to ways(3,1), set use=0, then call ways(3,2) for skip",
+                callStack: [{call: "ways(3,0)", amount:3, idx:0, value: "?"}, {call: "ways(3,1)", amount:3, idx:1, value: "?"}],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(0,1)", value:1, reason: "Base case: amount=0"}, {call: "ways(2,1)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(2,0)", value:2, reason: "use + skip =1+1=2"}, {call: "ways(3,1)", value:0, reason: "use + skip =0+0=0"}],
+                memo: [[1,-1],[1,0],[2,1],[0,-1]],
+                highlight: 1,
+                operation: "ways(3,1): Received use=0 from memo[1][1], skip=ways(3,2)=0 (idx>=2). Computed ways(3,1)=0, set memo[3][1]=0",
+                updatedMemo: [[3,1]]
+            },
+            {
+                step: 18,
+                description: "Back to ways(3,0), set skip=0, so ways(3,0)=2+0=2",
+                callStack: [],
+                returnStack: [{call: "ways(0,0)", value:1, reason: "Base case: amount=0"}, {call: "ways(1,1)", value:0, reason: "can't use coin, skip"}, {call: "ways(1,0)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(0,1)", value:1, reason: "Base case: amount=0"}, {call: "ways(2,1)", value:1, reason: "use + skip =1+0=1"}, {call: "ways(2,0)", value:2, reason: "use + skip =1+1=2"}, {call: "ways(3,1)", value:0, reason: "use + skip =0+0=0"}, {call: "ways(3,0)", value:2, reason: "use + skip =2+0=2"}],
+                memo: [[1,-1],[1,0],[2,1],[2,-1]],
+                highlight: 0,
+                operation: "ways(3,0): Computed 2, set memo[3][0]=2\nResult: There are 2 ways to make amount 3 with coins [1,2]: [1,1,1] and [1,2]",
+                updatedMemo: [[3,0]]
+            }
+        ];
+
+        const stepSlider = document.getElementById('stepSlider');
+        const stepLabel = document.getElementById('stepLabel');
+        stepSlider.max = executionSteps.length - 1;
+
+        function updateUI(step) {
+            const data = executionSteps[step];
+            stepLabel.innerText = `Step ${data.step}: ${data.description}`;
+
+            // Coins array
+            const coinsItemsEl = document.getElementById('coinsItems');
+            coinsItemsEl.innerHTML = '';
+            const topCall = data.callStack[data.callStack.length - 1];
+            const highlightCoin = topCall ? topCall.idx : null;
+            coins.forEach((coin, i) => {
+                const item = document.createElement('div');
+                item.className = 'array-item' + (i === highlightCoin ? ' highlighted' : '');
+                item.innerHTML = `<div class="array-index">${i}</div>${coin}`;
+                coinsItemsEl.appendChild(item);
+            });
+
+            // Memoization table
+            const memoGridEl = document.getElementById('memoGrid');
+            memoGridEl.innerHTML = '';
+            memoGridEl.style.gridTemplateColumns = `repeat(${coins.length + 1}, 1fr)`;
+
+            const amountHeader = document.createElement('div');
+            amountHeader.className = 'memo-cell header';
+            amountHeader.innerText = 'Amount';
+            memoGridEl.appendChild(amountHeader);
+
+            coins.forEach((coin, idx) => {
+                const header = document.createElement('div');
+                header.className = 'memo-cell header';
+                header.innerText = `Coin ${idx} (${coin})`;
+                memoGridEl.appendChild(header);
+            });
+
+            for (let amt = 0; amt <= amount; amt++) {
+                const amtCell = document.createElement('div');
+                amtCell.className = 'memo-cell header';
+                amtCell.innerText = amt;
+                memoGridEl.appendChild(amtCell);
+
+                for (let idx = 0; idx < coins.length; idx++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'memo-cell' + (data.memo[amt][idx] === -1 ? ' empty' : '') + (data.updatedMemo.some(u => u[0] === amt && u[1] === idx) ? ' updated' : '');
+                    cell.innerText = data.memo[amt][idx] === -1 ? '?' : data.memo[amt][idx];
+                    memoGridEl.appendChild(cell);
+                }
+            }
+
+            // Call Stack
+            const callStackEl = document.getElementById('callStack');
+            callStackEl.innerHTML = '';
+            data.callStack.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'stack-item' + (index === data.callStack.length - 1 ? ' processing' : ' active');
+                div.innerText = `${item.call} = ${item.value}`;
+                callStackEl.appendChild(div);
+            });
+
+            // Return Stack
+            const returnStackEl = document.getElementById('returnStack');
+            returnStackEl.innerHTML = '';
+            data.returnStack.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'stack-item computed';
+                div.innerText = `${item.call}=${item.value} (${item.reason})`;
+                returnStackEl.appendChild(div);
+            });
+
+            // Current Operation
+            document.getElementById('currentOperation').innerText = data.operation;
+        }
+
+        stepSlider.addEventListener('input', (e) => {
+            updateUI(parseInt(e.target.value));
+        });
+
+        // Initialize
+        updateUI(0);
+    </script>
+</body>
+</html>
