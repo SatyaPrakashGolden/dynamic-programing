@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kafka Event Flow - Order Processing System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .flow-container {
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .service {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            border-top: 4px solid;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .service:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .service.order { border-color: #3498db; }
+        .service.inventory { border-color: #e74c3c; }
+        .service.payment { border-color: #f39c12; }
+        .service.email { border-color: #9b59b6; }
+
+        .service-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 15px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+
+        .order .service-icon { background: #3498db; }
+        .inventory .service-icon { background: #e74c3c; }
+        .payment .service-icon { background: #f39c12; }
+        .email .service-icon { background: #9b59b6; }
+
+        .service h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .service-description {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .flow-steps {
+            margin-top: 40px;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .step::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+        }
+
+        .step-number {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-right: 25px;
+            flex-shrink: 0;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-title {
+            color: #2c3e50;
+            font-size: 1.4rem;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .step-details {
+            color: #5a6c7d;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .events {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .event {
+            background: #ecf0f1;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .event.creates {
+            background: #d5edda;
+            border-color: #27ae60;
+            color: #155724;
+        }
+
+        .event.listens {
+            background: #fff3cd;
+            border-color: #f39c12;
+            color: #856404;
+        }
+
+        .event:hover {
+            transform: scale(1.05);
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 10px;
+        }
+
+        .legend-color.creates { background: #27ae60; }
+        .legend-color.listens { background: #f39c12; }
+
+        @media (max-width: 768px) {
+            .services-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+            }
+            
+            .step {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .step-number {
+                margin-right: 0;
+                margin-bottom: 15px;
+            }
+            
+            .legend {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Kafka Event Flow</h1>
+            <p>Order Processing System with NestJS Microservices</p>
+        </div>
+
+        <div class="flow-container">
+            <div class="services-grid">
+                <div class="service order">
+                    <div class="service-icon">📋</div>
+                    <h3>Order Service</h3>
+                    <div class="service-description">Manages order lifecycle, confirmations, and cancellations</div>
+                </div>
+                <div class="service inventory">
+                    <div class="service-icon">📦</div>
+                    <h3>Inventory Service</h3>
+                    <div class="service-description">Handles stock checking, reservation, and inventory updates</div>
+                </div>
+                <div class="service payment">
+                    <div class="service-icon">💳</div>
+                    <h3>Payment Service</h3>
+                    <div class="service-description">Processes payments and handles transaction outcomes</div>
+                </div>
+                <div class="service email">
+                    <div class="service-icon">📧</div>
+                    <h3>Email Service</h3>
+                    <div class="service-description">Sends notifications and order status updates to customers</div>
+                </div>
+            </div>
+
+            <div class="flow-steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div class="step-title">Order Placement</div>
+                        <div class="step-details">
+                            <strong>Service:</strong> Order Service<br>
+                            <strong>Action:</strong> Customer places an order with items, quantities, and customer information.
+                        </div>
+                        <div class="events">
+                            <span class="event creates">Creates: OrderPlaced</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div class="step-title">Inventory Check</div>
+                        <div class="step-details">
+                            <strong>Service:</strong> Inventory Service<br>
+                            <strong>Action:</strong> Checks stock availability and reserves items if available, or fails if out of stock.
+                        </div>
+                        <div class="events">
+                            <span class="event listens">Listens: OrderPlaced</span>
+                            <span class="event creates">Creates: InventoryReserved</span>
+                            <span class="event creates">Creates: InventoryFailed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div class="step-title">Payment Processing</div>
+                        <div class="step-details">
+                            <strong>Service:</strong> Payment Service<br>
+                            <strong>Action:</strong> Processes payment only after inventory is confirmed, avoiding charges for unavailable items.
+                        </div>
+                        <div class="events">
+                            <span class="event listens">Listens: InventoryReserved</span>
+                            <span class="event creates">Creates: PaymentSuccessful</span>
+                            <span class="event creates">Creates: PaymentFailed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <div class="step-title">Order Confirmation/Cancellation</div>
+                        <div class="step-details">
+                            <strong>Service:</strong> Order Service<br>
+                            <strong>Action:</strong> Finalizes order status based on payment and inventory outcomes.
+                        </div>
+                        <div class="events">
+                            <span class="event listens">Listens: PaymentSuccessful</span>
+                            <span class="event listens">Listens: PaymentFailed</span>
+                            <span class="event listens">Listens: InventoryFailed</span>
+                            <span class="event creates">Creates: OrderConfirmed</span>
+                            <span class="event creates">Creates: OrderCancelled</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <div class="step-title">Inventory Update</div>
+                        <div class="step-details">
+                            <strong>Service:</strong> Inventory Service<br>
+                            <strong>Action:</strong> Updates inventory by deducting sold items or releasing reserved stock based on order outcome.
+                        </div>
+                        <div class="events">
+                            <span class="event listens">Listens: OrderConfirmed</span>
+                            <span class="event listens">Listens: PaymentFailed</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <div class="step-title">Email Notification</div>
+                        <div class="step-details">
+                            <strong>Service:</strong> Email Service<br>
+                            <strong>Action:</strong> Sends confirmation or cancellation emails to customers based on final order status.
+                        </div>
+                        <div class="events">
+                            <span class="event listens">Listens: OrderConfirmed</span>
+                            <span class="event listens">Listens: OrderCancelled</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color creates"></div>
+                    <span>Creates Event</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color listens"></div>
+                    <span>Listens to Event</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
